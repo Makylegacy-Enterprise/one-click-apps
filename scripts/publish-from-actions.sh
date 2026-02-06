@@ -58,12 +58,20 @@ echo "######### CLONING REMOTE_BRANCH: $REMOTE_BRANCH"
 echo "#############################################"
 
 cp -r $BUILD_DIR $SOURCE_DIRECTORY_DEPLOY_GH/
-git clone --single-branch --branch=$REMOTE_BRANCH $REMOTE_REPO $CLONED_DIRECTORY_DEPLOY_GH
-sleep 1s
+if git clone --single-branch --branch=$REMOTE_BRANCH $REMOTE_REPO $CLONED_DIRECTORY_DEPLOY_GH; then
+  echo "Cloned existing branch"
+else
+  echo "Branch not found, creating new one"
+  mkdir -p $CLONED_DIRECTORY_DEPLOY_GH
+  cd $CLONED_DIRECTORY_DEPLOY_GH
+  git init
+  git checkout -b $REMOTE_BRANCH
+  git remote add origin $REMOTE_REPO
+fi
 echo "#############################################"
 echo "######### Removing old files"
 echo "#############################################"
-cd $CLONED_DIRECTORY_DEPLOY_GH && git rm -rf . && git clean -fdx
+cd $CLONED_DIRECTORY_DEPLOY_GH && (git rm -rf . || true) && git clean -fdx
 sleep 1s
 echo "#############################################"
 echo "######### Copying files"
@@ -83,7 +91,7 @@ sleep 1s
 git config user.name "${GITHUB_ACTOR}"
 git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 echo $(date) >>forcebuild.date
-echo "caprover.com" >index.html
+echo "<html><head><meta http-equiv='refresh' content='0;url=v4/list'></head><body>Redirecting to app list...</body></html>" >index.html
 git add -A
 git commit -m 'Deploy to GitHub Pages'
 git push $REMOTE_REPO $REMOTE_BRANCH:$REMOTE_BRANCH
