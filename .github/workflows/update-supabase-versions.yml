@@ -65,6 +65,8 @@ jobs:
                   META_VERSION=$(grep -oP '(?<=supabase/postgres-meta:)[^\s"]+' "$COMPOSE" | head -1)
                   STUDIO_VERSION=$(grep -oP '(?<=supabase/studio:)[^\s"]+' "$COMPOSE" | head -1)
                   KONG_VERSION=$(grep -oP '(?<=kong:)[^\s"]+' "$COMPOSE" | head -1)
+                  EDGE_RUNTIME_VERSION=$(grep -oP '(?<=supabase/edge-runtime:)[^\s"]+' "$COMPOSE" | head -1)
+                  LOGFLARE_VERSION=$(grep -oP '(?<=supabase/logflare:)[^\s"]+' "$COMPOSE" | head -1)
 
                   echo "postgres_version=${POSTGRES_VERSION:-15.1.0.147}" >> $GITHUB_OUTPUT
                   echo "gotrue_version=${GOTRUE_VERSION:-v2.151.0}" >> $GITHUB_OUTPUT
@@ -75,17 +77,21 @@ jobs:
                   echo "meta_version=${META_VERSION:-v0.80.0}" >> $GITHUB_OUTPUT
                   echo "studio_version=${STUDIO_VERSION:-20240205-ce42139}" >> $GITHUB_OUTPUT
                   echo "kong_version=${KONG_VERSION:-2.8.1}" >> $GITHUB_OUTPUT
+                  echo "edge_runtime_version=${EDGE_RUNTIME_VERSION:-v1.45.2}" >> $GITHUB_OUTPUT
+                  echo "logflare_version=${LOGFLARE_VERSION:-1.4.0}" >> $GITHUB_OUTPUT
 
                   echo "Extracted versions:"
-                  echo "  postgres:     ${POSTGRES_VERSION}"
-                  echo "  gotrue:       ${GOTRUE_VERSION}"
-                  echo "  postgrest:    ${POSTGREST_VERSION}"
-                  echo "  realtime:     ${REALTIME_VERSION}"
-                  echo "  storage-api:  ${STORAGE_VERSION}"
-                  echo "  imgproxy:     ${IMGPROXY_VERSION}"
-                  echo "  postgres-meta:${META_VERSION}"
-                  echo "  studio:       ${STUDIO_VERSION}"
-                  echo "  kong:         ${KONG_VERSION}"
+                  echo "  postgres:       ${POSTGRES_VERSION}"
+                  echo "  gotrue:         ${GOTRUE_VERSION}"
+                  echo "  postgrest:      ${POSTGREST_VERSION}"
+                  echo "  realtime:       ${REALTIME_VERSION}"
+                  echo "  storage-api:    ${STORAGE_VERSION}"
+                  echo "  imgproxy:       ${IMGPROXY_VERSION}"
+                  echo "  postgres-meta:  ${META_VERSION}"
+                  echo "  studio:         ${STUDIO_VERSION}"
+                  echo "  kong:           ${KONG_VERSION}"
+                  echo "  edge-runtime:   ${EDGE_RUNTIME_VERSION}"
+                  echo "  logflare:       ${LOGFLARE_VERSION}"
 
             - name: Update supabase.yml with new versions
               id: update_yaml
@@ -102,6 +108,8 @@ jobs:
                   CURRENT_META=$(grep -oP '(?<=supabase/postgres-meta:)[^\s"]+' "$YAML_FILE" | head -1)
                   CURRENT_STUDIO=$(grep -oP '(?<=supabase/studio:)[^\s"]+' "$YAML_FILE" | head -1)
                   CURRENT_KONG=$(grep -oP '(?<=kong:)[^\s"]+' "$YAML_FILE" | head -1)
+                  CURRENT_EDGE_RUNTIME=$(grep -oP '(?<=supabase/edge-runtime:)[^\s"]+' "$YAML_FILE" | head -1)
+                  CURRENT_LOGFLARE=$(grep -oP '(?<=supabase/logflare:)[^\s"]+' "$YAML_FILE" | head -1)
 
                   NEW_POSTGRES="${{ steps.extract_versions.outputs.postgres_version }}"
                   NEW_GOTRUE="${{ steps.extract_versions.outputs.gotrue_version }}"
@@ -112,6 +120,8 @@ jobs:
                   NEW_META="${{ steps.extract_versions.outputs.meta_version }}"
                   NEW_STUDIO="${{ steps.extract_versions.outputs.studio_version }}"
                   NEW_KONG="${{ steps.extract_versions.outputs.kong_version }}"
+                  NEW_EDGE_RUNTIME="${{ steps.extract_versions.outputs.edge_runtime_version }}"
+                  NEW_LOGFLARE="${{ steps.extract_versions.outputs.logflare_version }}"
 
                   CHANGED=false
 
@@ -136,6 +146,8 @@ jobs:
                   update_version "$CURRENT_META" "$NEW_META" "supabase/postgres-meta"
                   update_version "$CURRENT_STUDIO" "$NEW_STUDIO" "supabase/studio"
                   update_version "$CURRENT_KONG" "$NEW_KONG" "kong"
+                  update_version "$CURRENT_EDGE_RUNTIME" "$NEW_EDGE_RUNTIME" "supabase/edge-runtime"
+                  update_version "$CURRENT_LOGFLARE" "$NEW_LOGFLARE" "supabase/logflare"
 
                   echo "changed=$CHANGED" >> $GITHUB_OUTPUT
 
@@ -172,6 +184,8 @@ jobs:
                       | Postgres Meta | `supabase/postgres-meta:${{ steps.extract_versions.outputs.meta_version }}` |
                       | Studio | `supabase/studio:${{ steps.extract_versions.outputs.studio_version }}` |
                       | Kong | `kong:${{ steps.extract_versions.outputs.kong_version }}` |
+                      | Edge Functions | `supabase/edge-runtime:${{ steps.extract_versions.outputs.edge_runtime_version }}` |
+                      | Analytics (Logflare) | `supabase/logflare:${{ steps.extract_versions.outputs.logflare_version }}` |
 
                       ### Source
                       - Supabase Release: [${{ steps.fetch_release.outputs.release_tag }}](https://github.com/supabase/supabase/releases/tag/${{ steps.fetch_release.outputs.release_tag }})

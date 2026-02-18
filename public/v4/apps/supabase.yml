@@ -14,6 +14,30 @@ services:
         caproverExtra:
             notExposeAsWebApp: 'true'
 
+    $$cap_appname-analytics:
+        image: supabase/logflare:1.4.0
+        restart: unless-stopped
+        environment:
+            LOGFLARE_NODE_HOST: 127.0.0.1
+            DB_USERNAME: supabase_admin
+            DB_DATABASE: postgres
+            DB_HOSTNAME: srv-captain--$$cap_appname-db
+            DB_PORT: '5432'
+            DB_PASSWORD: $$cap_postgres_password
+            DB_SCHEMA: _analytics
+            LOGFLARE_PUBLIC_ACCESS_TOKEN: $$cap_logflare_public_token
+            LOGFLARE_PRIVATE_ACCESS_TOKEN: $$cap_logflare_private_token
+            LOGFLARE_SINGLE_TENANT: 'true'
+            LOGFLARE_SUPABASE_MODE: 'true'
+            LOGFLARE_MIN_CLUSTER_SIZE: '1'
+            POSTGRES_BACKEND_URL: postgresql://supabase_admin:$$cap_postgres_password@srv-captain--$$cap_appname-db:5432/postgres
+            POSTGRES_BACKEND_SCHEMA: _analytics
+            LOGFLARE_FEATURE_FLAG_OVERRIDE: multibackend=true
+        caproverExtra:
+            notExposeAsWebApp: 'true'
+        depends_on:
+            - $$cap_appname-db
+
     $$cap_appname-kong:
         image: kong:2.8.1
         restart: unless-stopped
@@ -89,6 +113,30 @@ services:
                     \    - /storage/v1\n
                     \  plugins:\n
                     \  - name: cors\n
+                    - name: functions-v1\n
+                    \  url: http://srv-captain--$$cap_appname-functions:8081\n
+                    \  routes:\n
+                    \  - name: functions-v1-all\n
+                    \    strip_path: true\n
+                    \    paths:\n
+                    \    - /functions/v1\n
+                    \  plugins:\n
+                    \  - name: cors\n
+                    \  - name: key-auth\n
+                    \    config:\n
+                    \      hide_credentials: false\n
+                    - name: analytics-v1\n
+                    \  url: http://srv-captain--$$cap_appname-analytics:4000\n
+                    \  routes:\n
+                    \  - name: analytics-v1-all\n
+                    \    strip_path: true\n
+                    \    paths:\n
+                    \    - /analytics/v1\n
+                    \  plugins:\n
+                    \  - name: cors\n
+                    \  - name: key-auth\n
+                    \    config:\n
+                    \      hide_credentials: false\n
                     - name: meta\n
                     \  url: http://srv-captain--$$cap_appname-meta:8080\n
                     \  routes:\n
@@ -111,6 +159,7 @@ services:
                 - CMD ["kong", "docker-start"]
         depends_on:
             - $$cap_appname-db
+            - $$cap_appname-analytics
 
     $$cap_appname-auth:
         image: supabase/gotrue:v2.151.0
@@ -147,6 +196,7 @@ services:
             notExposeAsWebApp: 'true'
         depends_on:
             - $$cap_appname-db
+            - $$cap_appname-analytics
 
     $$cap_appname-rest:
         image: postgrest/postgrest:v12.0.2
@@ -241,6 +291,23 @@ services:
         depends_on:
             - $$cap_appname-db
 
+    $$cap_appname-functions:
+        image: supabase/edge-runtime:v1.45.2
+        restart: unless-stopped
+        environment:
+            JWT_SECRET: $$cap_jwt_secret
+            SUPABASE_URL: http://srv-captain--$$cap_appname-kong:8000
+            SUPABASE_ANON_KEY: $$cap_anon_key
+            SUPABASE_SERVICE_ROLE_KEY: $$cap_service_role_key
+            SUPABASE_DB_URL: postgresql://postgres:$$cap_postgres_password@srv-captain--$$cap_appname-db:5432/postgres
+            VERIFY_JWT: 'true'
+        caproverExtra:
+            notExposeAsWebApp: 'true'
+            containerHttpPort: '8081'
+        depends_on:
+            - $$cap_appname-db
+            - $$cap_appname-analytics
+
     $$cap_appname-studio:
         image: supabase/studio:20240205-ce42139
         restart: unless-stopped
@@ -254,7 +321,9 @@ services:
             SUPABASE_ANON_KEY: $$cap_anon_key
             SUPABASE_SERVICE_KEY: $$cap_service_role_key
             AUTH_JWT_SECRET: $$cap_jwt_secret
-            LOGFLARE_API_KEY: $$cap_gen_random_hex(32)
+            LOGFLARE_API_KEY: $$cap_logflare_public_token
+            LOGFLARE_PUBLIC_ACCESS_TOKEN: $$cap_logflare_public_token
+            LOGFLARE_PRIVATE_ACCESS_TOKEN: $$cap_logflare_private_token
             LOGFLARE_URL: http://srv-captain--$$cap_appname-analytics:4000
             NEXT_PUBLIC_ENABLE_LOGS: 'true'
             NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
@@ -262,16 +331,18 @@ services:
             containerHttpPort: '3000'
         depends_on:
             - $$cap_appname-kong
+            - $$cap_appname-analytics
 
 caproverOneClickApp:
     displayName: Supabase
     description: >-
-        Open source Firebase alternative with PostgreSQL, Auth, instant APIs, Realtime, Storage, and a web dashboard. Self-hosted on your own server.
+        Open source Firebase alternative with PostgreSQL, Auth, instant APIs, Realtime, Storage,
+        Edge Functions, Analytics (Logflare), and a web dashboard. Self-hosted on your own server.
     isOfficial: true
     documentation: https://supabase.com/docs/guides/self-hosting/docker
     instructions:
         start: |-
-            ## Supabase — Self-Hosted
+            ## Supabase — Self-Hosted (Full Stack)
 
             This deploys the **complete Supabase stack** on your server:
             - 🐘 **PostgreSQL** database with Supabase extensions
@@ -279,6 +350,8 @@ caproverOneClickApp:
             - ⚡ **REST API** (PostgREST) — auto-generated from your schema
             - 🔴 **Realtime** — WebSocket subscriptions
             - 🗄️ **Storage** — file uploads with image transformations
+            - ⚙️ **Edge Functions** (Deno) — serverless TypeScript functions
+            - 📊 **Analytics** (Logflare) — query logs and metrics
             - 🎛️ **Studio** — web dashboard for managing your project
             - 🌐 **Kong** — API gateway (your Supabase URL)
 
@@ -289,10 +362,11 @@ caproverOneClickApp:
         end: |-
             ## ✅ Supabase is deploying!
 
-            It may take 2-3 minutes for all services to start.
+            It may take 3-5 minutes for all 11 services to start.
 
             **Your Supabase URL:** `https://$$cap_appname.$$cap_root_domain`
             **Studio Dashboard:** Enable HTTPS on the `$$cap_appname-studio` app, then visit it.
+            **Edge Functions:** Deploy to `https://$$cap_appname.$$cap_root_domain/functions/v1/<function-name>`
 
             **SDK Configuration:**
             ```js
@@ -340,6 +414,22 @@ caproverOneClickApp:
               https://supabase.com/docs/guides/self-hosting#api-keys
               using your JWT_SECRET above with role=service_role, exp=never.
           defaultValue: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNjEzNTMxOTg1LCJleHAiOjQ3NjkyMDU5ODV9.example-replace-me
+          validRegex: /.{1,}/
+
+        - id: $$cap_logflare_public_token
+          label: Analytics | Logflare Public Access Token
+          description: >-
+              Token for public access to Logflare analytics (used by Studio for logs).
+              Auto-generated — you can leave this as-is.
+          defaultValue: $$cap_gen_random_hex(32)
+          validRegex: /.{1,}/
+
+        - id: $$cap_logflare_private_token
+          label: Analytics | Logflare Private Access Token
+          description: >-
+              Token for private/admin access to Logflare analytics.
+              Auto-generated — you can leave this as-is.
+          defaultValue: $$cap_gen_random_hex(32)
           validRegex: /.{1,}/
 
         - id: $$cap_site_url
