@@ -1,0 +1,190 @@
+name: Update Supabase Versions
+
+on:
+    schedule:
+        # Run every Monday at 08:00 UTC
+        - cron: '0 8 * * 1'
+    workflow_dispatch:
+        inputs:
+            dry_run:
+                description: 'Dry run (do not create PR)'
+                required: false
+                default: false
+                type: boolean
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    update-supabase:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GH_PERSONAL_TOKEN }}
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+
+            - name: Fetch latest Supabase release
+              id: fetch_release
+              run: |
+                  echo "Fetching latest Supabase release..."
+                  RELEASE=$(curl -s https://api.github.com/repos/supabase/supabase/releases/latest)
+                  RELEASE_TAG=$(echo "$RELEASE" | jq -r '.tag_name')
+                  echo "Latest Supabase release: $RELEASE_TAG"
+                  echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+
+                  # Fetch the docker-compose.yml from the release
+                  COMPOSE_URL="https://raw.githubusercontent.com/supabase/supabase/$RELEASE_TAG/docker/docker-compose.yml"
+                  echo "Fetching docker-compose from: $COMPOSE_URL"
+                  curl -s "$COMPOSE_URL" -o /tmp/supabase-docker-compose.yml
+                  echo "compose_url=$COMPOSE_URL" >> $GITHUB_OUTPUT
+
+            - name: Extract image versions from docker-compose
+              id: extract_versions
+              run: |
+                  COMPOSE=/tmp/supabase-docker-compose.yml
+
+                  extract_version() {
+                      local image_prefix=$1
+                      grep -oP "(?<=${image_prefix}:)[^\s\"']+" "$COMPOSE" | head -1
+                  }
+
+                  POSTGRES_VERSION=$(grep -oP '(?<=supabase/postgres:)[^\s"]+' "$COMPOSE" | head -1)
+                  GOTRUE_VERSION=$(grep -oP '(?<=supabase/gotrue:)[^\s"]+' "$COMPOSE" | head -1)
+                  POSTGREST_VERSION=$(grep -oP '(?<=postgrest/postgrest:)[^\s"]+' "$COMPOSE" | head -1)
+                  REALTIME_VERSION=$(grep -oP '(?<=supabase/realtime:)[^\s"]+' "$COMPOSE" | head -1)
+                  STORAGE_VERSION=$(grep -oP '(?<=supabase/storage-api:)[^\s"]+' "$COMPOSE" | head -1)
+                  IMGPROXY_VERSION=$(grep -oP '(?<=darthsim/imgproxy:)[^\s"]+' "$COMPOSE" | head -1)
+                  META_VERSION=$(grep -oP '(?<=supabase/postgres-meta:)[^\s"]+' "$COMPOSE" | head -1)
+                  STUDIO_VERSION=$(grep -oP '(?<=supabase/studio:)[^\s"]+' "$COMPOSE" | head -1)
+                  KONG_VERSION=$(grep -oP '(?<=kong:)[^\s"]+' "$COMPOSE" | head -1)
+
+                  echo "postgres_version=${POSTGRES_VERSION:-15.1.0.147}" >> $GITHUB_OUTPUT
+                  echo "gotrue_version=${GOTRUE_VERSION:-v2.151.0}" >> $GITHUB_OUTPUT
+                  echo "postgrest_version=${POSTGREST_VERSION:-v12.0.2}" >> $GITHUB_OUTPUT
+                  echo "realtime_version=${REALTIME_VERSION:-v2.28.32}" >> $GITHUB_OUTPUT
+                  echo "storage_version=${STORAGE_VERSION:-v1.0.6}" >> $GITHUB_OUTPUT
+                  echo "imgproxy_version=${IMGPROXY_VERSION:-v3.8.0}" >> $GITHUB_OUTPUT
+                  echo "meta_version=${META_VERSION:-v0.80.0}" >> $GITHUB_OUTPUT
+                  echo "studio_version=${STUDIO_VERSION:-20240205-ce42139}" >> $GITHUB_OUTPUT
+                  echo "kong_version=${KONG_VERSION:-2.8.1}" >> $GITHUB_OUTPUT
+
+                  echo "Extracted versions:"
+                  echo "  postgres:     ${POSTGRES_VERSION}"
+                  echo "  gotrue:       ${GOTRUE_VERSION}"
+                  echo "  postgrest:    ${POSTGREST_VERSION}"
+                  echo "  realtime:     ${REALTIME_VERSION}"
+                  echo "  storage-api:  ${STORAGE_VERSION}"
+                  echo "  imgproxy:     ${IMGPROXY_VERSION}"
+                  echo "  postgres-meta:${META_VERSION}"
+                  echo "  studio:       ${STUDIO_VERSION}"
+                  echo "  kong:         ${KONG_VERSION}"
+
+            - name: Update supabase.yml with new versions
+              id: update_yaml
+              run: |
+                  YAML_FILE="public/v4/apps/supabase.yml"
+
+                  # Read current versions from the YAML
+                  CURRENT_POSTGRES=$(grep -oP '(?<=supabase/postgres:)[^\s"]+' "$YAML_FILE" | head -1)
+                  CURRENT_GOTRUE=$(grep -oP '(?<=supabase/gotrue:)[^\s"]+' "$YAML_FILE" | head -1)
+                  CURRENT_POSTGREST=$(grep -oP '(?<=postgrest/postgrest:)[^\s"]+' "$YAML_FILE" | head -1)
+                  CURRENT_REALTIME=$(grep -oP '(?<=supabase/realtime:)[^\s"]+' "$YAML_FILE" | head -1)
+                  CURRENT_STORAGE=$(grep -oP '(?<=supabase/storage-api:)[^\s"]+' "$YAML_FILE" | head -1)
+                  CURRENT_IMGPROXY=$(grep -oP '(?<=darthsim/imgproxy:)[^\s"]+' "$YAML_FILE" | head -1)
+                  CURRENT_META=$(grep -oP '(?<=supabase/postgres-meta:)[^\s"]+' "$YAML_FILE" | head -1)
+                  CURRENT_STUDIO=$(grep -oP '(?<=supabase/studio:)[^\s"]+' "$YAML_FILE" | head -1)
+                  CURRENT_KONG=$(grep -oP '(?<=kong:)[^\s"]+' "$YAML_FILE" | head -1)
+
+                  NEW_POSTGRES="${{ steps.extract_versions.outputs.postgres_version }}"
+                  NEW_GOTRUE="${{ steps.extract_versions.outputs.gotrue_version }}"
+                  NEW_POSTGREST="${{ steps.extract_versions.outputs.postgrest_version }}"
+                  NEW_REALTIME="${{ steps.extract_versions.outputs.realtime_version }}"
+                  NEW_STORAGE="${{ steps.extract_versions.outputs.storage_version }}"
+                  NEW_IMGPROXY="${{ steps.extract_versions.outputs.imgproxy_version }}"
+                  NEW_META="${{ steps.extract_versions.outputs.meta_version }}"
+                  NEW_STUDIO="${{ steps.extract_versions.outputs.studio_version }}"
+                  NEW_KONG="${{ steps.extract_versions.outputs.kong_version }}"
+
+                  CHANGED=false
+
+                  update_version() {
+                      local old=$1 new=$2 label=$3
+                      if [ -n "$new" ] && [ "$old" != "$new" ]; then
+                          sed -i "s|${old}|${new}|g" "$YAML_FILE"
+                          echo "  ✅ Updated $label: $old → $new"
+                          CHANGED=true
+                      else
+                          echo "  ⏭️  No change for $label (current: $old)"
+                      fi
+                  }
+
+                  echo "Checking for version updates..."
+                  update_version "$CURRENT_POSTGRES" "$NEW_POSTGRES" "supabase/postgres"
+                  update_version "$CURRENT_GOTRUE" "$NEW_GOTRUE" "supabase/gotrue"
+                  update_version "$CURRENT_POSTGREST" "$NEW_POSTGREST" "postgrest/postgrest"
+                  update_version "$CURRENT_REALTIME" "$NEW_REALTIME" "supabase/realtime"
+                  update_version "$CURRENT_STORAGE" "$NEW_STORAGE" "supabase/storage-api"
+                  update_version "$CURRENT_IMGPROXY" "$NEW_IMGPROXY" "darthsim/imgproxy"
+                  update_version "$CURRENT_META" "$NEW_META" "supabase/postgres-meta"
+                  update_version "$CURRENT_STUDIO" "$NEW_STUDIO" "supabase/studio"
+                  update_version "$CURRENT_KONG" "$NEW_KONG" "kong"
+
+                  echo "changed=$CHANGED" >> $GITHUB_OUTPUT
+
+            - name: Validate updated YAML
+              if: steps.update_yaml.outputs.changed == 'true'
+              run: |
+                  npm ci
+                  node scripts/validate_apps.js
+                  echo "✅ YAML validation passed"
+
+            - name: Create Pull Request
+              if: steps.update_yaml.outputs.changed == 'true' && github.event.inputs.dry_run != 'true'
+              uses: peter-evans/create-pull-request@v6
+              with:
+                  token: ${{ secrets.GH_PERSONAL_TOKEN }}
+                  commit-message: 'chore: update Supabase to ${{ steps.fetch_release.outputs.release_tag }}'
+                  branch: 'auto/update-supabase-${{ steps.fetch_release.outputs.release_tag }}'
+                  delete-branch: true
+                  title: '🚀 Update Supabase to ${{ steps.fetch_release.outputs.release_tag }}'
+                  body: |
+                      ## Automated Supabase Version Update
+
+                      This PR updates the Supabase one-click app to the latest stable release: **${{ steps.fetch_release.outputs.release_tag }}**
+
+                      ### Updated Images
+                      | Service | Image |
+                      |---|---|
+                      | PostgreSQL | `supabase/postgres:${{ steps.extract_versions.outputs.postgres_version }}` |
+                      | Auth (GoTrue) | `supabase/gotrue:${{ steps.extract_versions.outputs.gotrue_version }}` |
+                      | REST (PostgREST) | `postgrest/postgrest:${{ steps.extract_versions.outputs.postgrest_version }}` |
+                      | Realtime | `supabase/realtime:${{ steps.extract_versions.outputs.realtime_version }}` |
+                      | Storage | `supabase/storage-api:${{ steps.extract_versions.outputs.storage_version }}` |
+                      | Image Proxy | `darthsim/imgproxy:${{ steps.extract_versions.outputs.imgproxy_version }}` |
+                      | Postgres Meta | `supabase/postgres-meta:${{ steps.extract_versions.outputs.meta_version }}` |
+                      | Studio | `supabase/studio:${{ steps.extract_versions.outputs.studio_version }}` |
+                      | Kong | `kong:${{ steps.extract_versions.outputs.kong_version }}` |
+
+                      ### Source
+                      - Supabase Release: [${{ steps.fetch_release.outputs.release_tag }}](https://github.com/supabase/supabase/releases/tag/${{ steps.fetch_release.outputs.release_tag }})
+                      - Docker Compose: ${{ steps.fetch_release.outputs.compose_url }}
+
+                      ---
+                      *This PR was automatically created by the [Update Supabase Versions](.github/workflows/update-supabase-versions.yml) workflow.*
+                  labels: |
+                      automated
+                      dependencies
+                      supabase
+
+            - name: No updates needed
+              if: steps.update_yaml.outputs.changed == 'false'
+              run: |
+                  echo "✅ Supabase is already up to date. No changes needed."

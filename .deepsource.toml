@@ -1,0 +1,25 @@
+version = 1
+
+[[analyzers]]
+name = "javascript"
+enabled = true
+
+  [analyzers.meta]
+  plugins = ["react", "node"]
+  environment = ["nodejs"]
+
+[[analyzers]]
+name = "docker"
+enabled = true
+
+[[transformers]]
+name = "prettier"
+enabled = true
+
+exclude_patterns = [
+  "node_modules/**",
+  "built/**",
+  "dist/**",
+  ".next/**",
+  "*.min.js"
+]

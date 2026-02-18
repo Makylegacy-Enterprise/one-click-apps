@@ -1,0 +1,80 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:recommended",
+        ":automergeMinor",
+        ":automergeDigest",
+        ":automergePatch",
+        "group:allNonMajor"
+    ],
+    "labels": [
+        "dependencies",
+        "renovate"
+    ],
+    "schedule": [
+        "before 6am on monday"
+    ],
+    "timezone": "Africa/Nairobi",
+    "prHourlyLimit": 5,
+    "prConcurrentLimit": 10,
+    "packageRules": [
+        {
+            "description": "Auto-merge dev dependencies",
+            "matchDepTypes": [
+                "devDependencies"
+            ],
+            "automerge": true,
+            "automergeType": "pr",
+            "automergeStrategy": "squash"
+        },
+        {
+            "description": "Group TypeScript ecosystem",
+            "matchPackagePrefixes": [
+                "@types/",
+                "typescript"
+            ],
+            "groupName": "TypeScript ecosystem"
+        },
+        {
+            "description": "Group Next.js ecosystem",
+            "matchPackagePrefixes": [
+                "next",
+                "@next/",
+                "eslint-config-next"
+            ],
+            "groupName": "Next.js ecosystem"
+        },
+        {
+            "description": "Group React ecosystem",
+            "matchPackagePrefixes": [
+                "react",
+                "@types/react"
+            ],
+            "groupName": "React ecosystem"
+        },
+        {
+            "description": "Group Supabase",
+            "matchPackagePrefixes": [
+                "@supabase/"
+            ],
+            "groupName": "Supabase"
+        },
+        {
+            "description": "Don't auto-merge major updates",
+            "matchUpdateTypes": [
+                "major"
+            ],
+            "automerge": false,
+            "labels": [
+                "dependencies",
+                "breaking"
+            ]
+        }
+    ],
+    "vulnerabilityAlerts": {
+        "enabled": true,
+        "labels": [
+            "security"
+        ]
+    }
+}
