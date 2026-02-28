@@ -296,7 +296,7 @@ services:
         restart: unless-stopped
         environment:
             JWT_SECRET: $$cap_jwt_secret
-            SUPABASE_URL: http://srv-captain--$$cap_appname-kong:8000
+            SUPABASE_URL: http://srv-captain--$$cap_appname-kong
             SUPABASE_ANON_KEY: $$cap_anon_key
             SUPABASE_SERVICE_ROLE_KEY: $$cap_service_role_key
             SUPABASE_DB_URL: postgresql://postgres:$$cap_postgres_password@srv-captain--$$cap_appname-db:5432/postgres
@@ -316,7 +316,7 @@ services:
             POSTGRES_PASSWORD: $$cap_postgres_password
             DEFAULT_ORGANIZATION_NAME: $$cap_org_name
             DEFAULT_PROJECT_NAME: $$cap_appname
-            SUPABASE_URL: http://srv-captain--$$cap_appname-kong:8000
+            SUPABASE_URL: http://srv-captain--$$cap_appname-kong
             SUPABASE_PUBLIC_URL: https://$$cap_appname.$$cap_root_domain
             SUPABASE_ANON_KEY: $$cap_anon_key
             SUPABASE_SERVICE_KEY: $$cap_service_role_key
