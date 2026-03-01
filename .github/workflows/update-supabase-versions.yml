@@ -128,7 +128,7 @@ jobs:
                   update_version() {
                       local old=$1 new=$2 label=$3
                       if [ -n "$new" ] && [ "$old" != "$new" ]; then
-                          sed -i "s|${old}|${new}|g" "$YAML_FILE"
+                          sed -i "s|${label}:${old}|${label}:${new}|g" "$YAML_FILE"
                           echo "  ✅ Updated $label: $old → $new"
                           CHANGED=true
                       else

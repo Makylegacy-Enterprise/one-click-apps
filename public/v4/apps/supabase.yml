@@ -39,7 +39,7 @@ services:
             - $$cap_appname-db
 
     $$cap_appname-kong:
-        image: kong:8000
+        image: kong:2.8.1
         restart: unless-stopped
         environment:
             KONG_DATABASE: 'off'
@@ -55,7 +55,7 @@ services:
         caproverExtra:
             containerHttpPort: '8000'
             dockerfileLines:
-                - FROM kong:8000
+                - FROM kong:2.8.1
                 - RUN mkdir -p /var/lib/kong
                 - >-
                     RUN printf 'services:\n
