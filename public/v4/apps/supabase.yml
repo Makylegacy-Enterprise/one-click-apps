@@ -56,7 +56,8 @@ services:
             containerHttpPort: '8000'
             dockerfileLines:
                 - FROM kong:2.8.1
-                - RUN mkdir -p /var/lib/kong
+                - USER root
+                - RUN mkdir -p /var/lib/kong && chown kong:kong /var/lib/kong
                 - >-
                     RUN printf 'services:\n
                     - name: auth-v1-open\n
@@ -155,6 +156,7 @@ services:
                     - username: service_role\n
                     \  keyauth_credentials:\n
                     \  - key: $$cap_service_role_key\n' > /var/lib/kong/kong.yml
+                - USER kong
                 - EXPOSE 8000
                 - CMD ["kong", "docker-start"]
         depends_on:
