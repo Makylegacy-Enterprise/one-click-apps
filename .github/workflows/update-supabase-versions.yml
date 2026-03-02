@@ -64,7 +64,8 @@ jobs:
                   IMGPROXY_VERSION=$(grep -oP '(?<=darthsim/imgproxy:)[^\s"]+' "$COMPOSE" | head -1)
                   META_VERSION=$(grep -oP '(?<=supabase/postgres-meta:)[^\s"]+' "$COMPOSE" | head -1)
                   STUDIO_VERSION=$(grep -oP '(?<=supabase/studio:)[^\s"]+' "$COMPOSE" | head -1)
-                  KONG_VERSION=$(grep -oP '(?<=kong:)[^\s"]+' "$COMPOSE" | head -1)
+                  # Kong grep must be specific: match 'image: kong:' to avoid matching chown kong:kong, containerHttpPort, etc.
+                  KONG_VERSION=$(grep -oP '(?<=image:\s{0,10}kong:)[^\s"]+' "$COMPOSE" | head -1)
                   EDGE_RUNTIME_VERSION=$(grep -oP '(?<=supabase/edge-runtime:)[^\s"]+' "$COMPOSE" | head -1)
                   LOGFLARE_VERSION=$(grep -oP '(?<=supabase/logflare:)[^\s"]+' "$COMPOSE" | head -1)
 
@@ -107,7 +108,8 @@ jobs:
                   CURRENT_IMGPROXY=$(grep -oP '(?<=darthsim/imgproxy:)[^\s"]+' "$YAML_FILE" | head -1)
                   CURRENT_META=$(grep -oP '(?<=supabase/postgres-meta:)[^\s"]+' "$YAML_FILE" | head -1)
                   CURRENT_STUDIO=$(grep -oP '(?<=supabase/studio:)[^\s"]+' "$YAML_FILE" | head -1)
-                  CURRENT_KONG=$(grep -oP '(?<=kong:)[^\s"]+' "$YAML_FILE" | head -1)
+                  # Must match 'image: kong:' specifically to avoid matching chown kong:kong, port 8000, etc.
+                  CURRENT_KONG=$(grep -oP '(?<=image:\s{0,10}kong:)[^\s"]+' "$YAML_FILE" | head -1)
                   CURRENT_EDGE_RUNTIME=$(grep -oP '(?<=supabase/edge-runtime:)[^\s"]+' "$YAML_FILE" | head -1)
                   CURRENT_LOGFLARE=$(grep -oP '(?<=supabase/logflare:)[^\s"]+' "$YAML_FILE" | head -1)
 
@@ -145,7 +147,16 @@ jobs:
                   update_version "$CURRENT_IMGPROXY" "$NEW_IMGPROXY" "darthsim/imgproxy"
                   update_version "$CURRENT_META" "$NEW_META" "supabase/postgres-meta"
                   update_version "$CURRENT_STUDIO" "$NEW_STUDIO" "supabase/studio"
-                  update_version "$CURRENT_KONG" "$NEW_KONG" "kong"
+                  # Kong needs special handling: update both 'image: kong:' and 'FROM kong:'
+                  # but NOT 'chown kong:kong' or other non-image references
+                  if [ -n "$NEW_KONG" ] && [ "$CURRENT_KONG" != "$NEW_KONG" ]; then
+                      sed -i "s|image: kong:${CURRENT_KONG}|image: kong:${NEW_KONG}|g" "$YAML_FILE"
+                      sed -i "s|FROM kong:${CURRENT_KONG}|FROM kong:${NEW_KONG}|g" "$YAML_FILE"
+                      echo "  ✅ Updated kong: $CURRENT_KONG → $NEW_KONG"
+                      CHANGED=true
+                  else
+                      echo "  ⏭️  No change for kong (current: $CURRENT_KONG)"
+                  fi
                   update_version "$CURRENT_EDGE_RUNTIME" "$NEW_EDGE_RUNTIME" "supabase/edge-runtime"
                   update_version "$CURRENT_LOGFLARE" "$NEW_LOGFLARE" "supabase/logflare"
 
@@ -156,6 +167,20 @@ jobs:
               run: |
                   npm ci
                   node scripts/validate_apps.js
+
+                  # Sanity check: ensure no port numbers leaked into image tags
+                  YAML_FILE="public/v4/apps/supabase.yml"
+                  if grep -qP 'image:\s+\S+:\d{4,5}\s*$' "$YAML_FILE"; then
+                      echo "❌ ERROR: Found image tag that looks like a port number!"
+                      grep -nP 'image:\s+\S+:\d{4,5}\s*$' "$YAML_FILE"
+                      exit 1
+                  fi
+                  if grep -qP 'FROM\s+\S+:\d{4,5}\s*$' "$YAML_FILE"; then
+                      echo "❌ ERROR: Found FROM tag that looks like a port number!"
+                      grep -nP 'FROM\s+\S+:\d{4,5}\s*$' "$YAML_FILE"
+                      exit 1
+                  fi
+
                   echo "✅ YAML validation passed"
 
             - name: Create Pull Request

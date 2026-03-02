@@ -61,6 +61,32 @@
                          if (s.image && s.image.endsWith(':latest')) {
                              // throw new Error(`"latest" tag is not allowed as it can change and break the setup, see ${apps[i]}`);
                          }
+
+                         // Validate image tags don't look like port numbers (e.g. kong:8000)
+                         if (s.image) {
+                             const tag = s.image.includes(':') ? s.image.split(':').pop() : '';
+                             if (tag && /^\d{4,5}$/.test(tag)) {
+                                 throw new Error(
+                                     `Image tag "${tag}" in "${s.image}" looks like a port number, not a version. ` +
+                                     `Check service "${serviceName}" in ${apps[i]}`
+                                 );
+                             }
+                         }
+
+                         // Also validate dockerfileLines FROM instructions
+                         const dfl = (s.caproverExtra && s.caproverExtra.dockerfileLines) || [];
+                         dfl.forEach((line) => {
+                             if (typeof line === 'string' && line.startsWith('FROM ')) {
+                                 const fromImage = line.replace('FROM ', '').trim();
+                                 const fromTag = fromImage.includes(':') ? fromImage.split(':').pop() : '';
+                                 if (fromTag && /^\d{4,5}$/.test(fromTag)) {
+                                     throw new Error(
+                                         `Dockerfile FROM tag "${fromTag}" in "${fromImage}" looks like a port number. ` +
+                                         `Check service "${serviceName}" in ${apps[i]}`
+                                     );
+                                 }
+                             }
+                         });
                      });
 
                  const logoFileName = apps[i] + '.png';
