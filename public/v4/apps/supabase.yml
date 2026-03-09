@@ -15,7 +15,7 @@ services:
             notExposeAsWebApp: 'true'
 
     $$cap_appname-analytics:
-        image: supabase/logflare:1.30.3
+        image: supabase/logflare:1.31.2
         restart: unless-stopped
         environment:
             LOGFLARE_NODE_HOST: 127.0.0.1
@@ -39,7 +39,7 @@ services:
             - $$cap_appname-db
 
     $$cap_appname-kong:
-        image: kong:2.8.1
+        image: kong:2.8.12.8.1
         restart: unless-stopped
         environment:
             KONG_DATABASE: 'off'
@@ -55,7 +55,7 @@ services:
         caproverExtra:
             containerHttpPort: '8000'
             dockerfileLines:
-                - FROM kong:2.8.1
+                - FROM kong:2.8.12.8.1
                 - USER root
                 - RUN mkdir -p /var/lib/kong && chown kong:kong /var/lib/kong
                 - >-
@@ -167,7 +167,7 @@ services:
             - $$cap_appname-analytics
 
     $$cap_appname-auth:
-        image: supabase/gotrue:v2.185.0
+        image: supabase/gotrue:v2.186.0
         restart: unless-stopped
         environment:
             GOTRUE_API_HOST: '0.0.0.0'
@@ -204,7 +204,7 @@ services:
             - $$cap_appname-analytics
 
     $$cap_appname-rest:
-        image: postgrest/postgrest:v14.3
+        image: postgrest/postgrest:v14.5
         restart: unless-stopped
         environment:
             PGRST_DB_URI: postgres://authenticator:$$cap_postgres_password@srv-captain--$$cap_appname-db:5432/postgres
@@ -220,7 +220,7 @@ services:
             - $$cap_appname-db
 
     $$cap_appname-realtime:
-        image: supabase/realtime:v2.72.0
+        image: supabase/realtime:v2.76.5
         restart: unless-stopped
         environment:
             PORT: '4000'
@@ -244,7 +244,7 @@ services:
             - $$cap_appname-db
 
     $$cap_appname-storage:
-        image: supabase/storage-api:v1.37.1
+        image: supabase/storage-api:v1.37.8
         restart: unless-stopped
         volumes:
             - $$cap_appname-storage-data:/var/lib/storage
@@ -297,7 +297,7 @@ services:
             - $$cap_appname-db
 
     $$cap_appname-functions:
-        image: supabase/edge-runtime:v1.70.0
+        image: supabase/edge-runtime:v1.70.3
         restart: unless-stopped
         environment:
             JWT_SECRET: $$cap_jwt_secret
@@ -314,7 +314,7 @@ services:
             - $$cap_appname-analytics
 
     $$cap_appname-studio:
-        image: supabase/studio:2026.01.27-sha-6aa59ff
+        image: supabase/studio:2026.02.16-sha-26c615c
         restart: unless-stopped
         environment:
             STUDIO_PG_META_URL: http://srv-captain--$$cap_appname-meta:8080
